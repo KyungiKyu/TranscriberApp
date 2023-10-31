@@ -35,16 +35,16 @@ class HoverListWidget(QtWidgets.QListWidget):
         self.button_widget = ButtonWidget(self)
         self.button_widget.hide()
 
-    def enterEvent(self, event: QtGui.QEnterEvent):  # Ensure the event is of type QEnterEvent
-        super().enterEvent(event)  # Call the base class implementation
-        item = self.itemAt(self.mapFromGlobal(QtGui.QCursor.pos()))  # Get the item at the cursor position
+    def enterEvent(self, event: QtGui.QEnterEvent):  
+        super().enterEvent(event)  
+        item = self.itemAt(self.mapFromGlobal(QtGui.QCursor.pos()))  
         if item:
             rect = self.visualItemRect(item)
             self.button_widget.move(rect.right(), rect.top())
             self.button_widget.show()
 
-    def leaveEvent(self, event: QtCore.QEvent):  # Ensure the event is of type QEvent
-        super().leaveEvent(event)  # Call the base class implementation
+    def leaveEvent(self, event: QtCore.QEvent):  
+        super().leaveEvent(event)  
         self.button_widget.hide()
 
 class Ui_MainWindow(object):
@@ -97,15 +97,35 @@ class Ui_MainWindow(object):
         self.populate_language_select()
         self.LanguageSelect.currentTextChanged.connect(self.on_language_select_changed)
         self.verticalLayout.addLayout(self.gridLayout)
-        self.recordings = HoverListWidget(self.centralwidget)  # Replace your existing QListWidget with HoverListWidget
+        self.recordings = HoverListWidget(self.centralwidget)  
         self.recordings.setMaximumSize(QtCore.QSize(385, 16777215))
         self.recordings.setObjectName("recordings")
         self.populate_recordings()
         self.verticalLayout.addWidget(self.recordings)
         self.horizontalLayout.addLayout(self.verticalLayout)
-        self.textBrowser = QtWidgets.QTextBrowser(parent=self.centralwidget)
-        self.textBrowser.setObjectName("textBrowser")
-        self.horizontalLayout.addWidget(self.textBrowser)
+
+        # Tab Widget
+        self.tabWidget = QtWidgets.QTabWidget(self.centralwidget)
+        self.tabWidget.setObjectName("tabWidget")
+
+        # Tab 1: Summary
+        self.tabSummary = QtWidgets.QWidget()
+        self.tabSummary.setObjectName("tabSummary")
+        self.summaryLayout = QtWidgets.QVBoxLayout(self.tabSummary)
+        self.summaryTextBrowser = QtWidgets.QTextBrowser(self.tabSummary)
+        self.summaryLayout.addWidget(self.summaryTextBrowser)
+        self.tabWidget.addTab(self.tabSummary, "Summary")
+
+        # Tab 2: Transcription
+        self.tabTranscription = QtWidgets.QWidget()
+        self.tabTranscription.setObjectName("tabTranscription")
+        self.transcriptionLayout = QtWidgets.QVBoxLayout(self.tabTranscription)
+        self.transcriptionTextBrowser = QtWidgets.QTextBrowser(self.tabTranscription)
+        self.transcriptionLayout.addWidget(self.transcriptionTextBrowser)
+        self.tabWidget.addTab(self.tabTranscription, "Transcription")
+
+        self.horizontalLayout.addWidget(self.tabWidget)
+        
         self.verticalLayout_2.addLayout(self.horizontalLayout)
         self.gridLayout_2 = QtWidgets.QGridLayout()
         self.gridLayout_2.setObjectName("gridLayout_2")
@@ -183,17 +203,18 @@ class Ui_MainWindow(object):
         self.actionNew.setText(_translate("MainWindow", "New"))
 
     def open_file_dialog(self):
-        file_name= QFileDialog.getOpenFileName(
+        file_name, _ = QFileDialog.getOpenFileName(
             None,
             "Import File",
             "",
             str("Audio Files (*.mp3 *.wav);;Video Files (*.mp4)")
         )
-        if file_name:
-            shutil.copy2(file_name[0],os.getcwd().replace('\\','/')+"/DATA")
-            self.populate_recordings()
+        if not file_name:  # Check if file selection was canceled
+            return  # Do nothing if canceled
 
-            self.recorder.start_transcribe_file(self.DATA+file_name[0].split('/')[::-1][0])
+        shutil.copy2(file_name, os.path.join(self.DATA, os.path.basename(file_name)))
+        self.populate_recordings()
+        self.recorder.start_transcribe_file(os.path.join(self.DATA, os.path.basename(file_name)))
 
     def populate_mic_select(self):
         # Get the list of available microphones.
@@ -249,15 +270,16 @@ class Ui_MainWindow(object):
             # Try to open and read the file.
             with open(file_path, 'r') as file:
                 text = file.read()
-
         except FileNotFoundError:
             text = "The corresponding text file could not be found."
-
         except Exception as e:
             text = f"An error occurred: {str(e)}"
 
-        # Set the text to the textBrowser.
-        self.textBrowser.setText(text)
+        # Set the text to the Transcription tab's textBrowser.
+        self.transcriptionTextBrowser.setText(text)
+
+        # Set placeholder text for the Summary tab.
+        self.summaryTextBrowser.setText("Summary placeholder text.")
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)

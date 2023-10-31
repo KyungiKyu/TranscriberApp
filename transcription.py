@@ -2,13 +2,11 @@ import os
 import wave
 import pyaudio
 import threading
+import asyncio
 from deepgram import Deepgram
-import speech_recognition as sr
 
 class AudioRecorder:
     def __init__(self, deepgram_api_key):
-        self.recognizer = sr.Recognizer()
-        self.microphone = sr.Microphone()
         self.audio_frames = []
         self.is_recording = False
         self.stream = None
@@ -88,12 +86,17 @@ class AudioRecorder:
         print(f"Transcription saved to {self.transcription_file}.")
 
     def start_transcribe_file(self, path):
-        transcription_thread = threading.Thread(target=self.transcribe_file, args=(path,))
+        transcription_thread = threading.Thread(target=self._run_async_transcription, args=(path,))
         transcription_thread.start()
 
-    def transcribe_file(self, path):
+    def _run_async_transcription(self, path):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(self.transcribe_file(path))
+
+    async def transcribe_file(self, path):
         with open(path, 'rb') as audio_file:
-            response = self.deepgram_client.transcription.prerecorded(
+            response = await self.deepgram_client.transcription.prerecorded(
                 {'buffer': audio_file, 'mimetype': 'audio/wav'},
                 {'punctuate': True, 'diarize': True}
             )
