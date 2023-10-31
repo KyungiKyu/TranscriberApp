@@ -8,6 +8,7 @@ import shutil
 
 # Local Packages Import
 from transcription import AudioRecorder
+
 class ButtonWidget(QtWidgets.QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -46,11 +47,9 @@ class HoverListWidget(QtWidgets.QListWidget):
         super().leaveEvent(event)  # Call the base class implementation
         self.button_widget.hide()
 
-
-
 class Ui_MainWindow(object):
     def __init__(self):
-        self.recorder = AudioRecorder()
+        self.recorder = AudioRecorder(os.getenv('Deepgram_API_Key'))
         self.mics = sd.query_devices()
         self.Mic = [mic['name'] for mic in self.mics if mic['max_input_channels'] > 0][0]
         self.Language = 'de-DE'

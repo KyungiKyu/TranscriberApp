@@ -2,20 +2,19 @@ import os
 import wave
 import pyaudio
 import threading
+from deepgram import Deepgram
 import speech_recognition as sr
-from pyannote.audio import Pipeline
 
 class AudioRecorder:
-    def __init__(self):
+    def __init__(self, deepgram_api_key):
         self.recognizer = sr.Recognizer()
         self.microphone = sr.Microphone()
         self.audio_frames = []
         self.is_recording = False
         self.stream = None
         self.transcription_file = None
-        self.language = 'de-DE'
-        YOUR_AUTH_TOKEN = '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'
-        self.diarization_pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization", use_auth_token=YOUR_AUTH_TOKEN)
+        self.language = 'en-US'  # Update this based on your preference
+        self.deepgram_client = Deepgram(deepgram_api_key)
 
     def start_recording(self, mic_index, language):
         if self.is_recording:
@@ -36,7 +35,7 @@ class AudioRecorder:
 
         recording_thread = threading.Thread(target=self._record)
         recording_thread.start()
-        transcription_thread = threading.Thread(target=self._transcribe)
+        transcription_thread = threading.Thread(target=self._transcribe_live)
         transcription_thread.start()
 
         print("Recording and transcribing started.")
@@ -47,22 +46,21 @@ class AudioRecorder:
             self.audio_frames.append(data)
         print("Recording stopped.")
 
-    def _transcribe(self):
-        while self.is_recording:
-            if not self.audio_frames:
-                continue
-
-            audio_data = sr.AudioData(b''.join(self.audio_frames), 16000, 2)
-            try:
-                transcription = self.recognizer.recognize_google(audio_data, language=self.language)
-                if self.transcription_file:
-                    with open(self.transcription_file, 'a') as f:
-                        f.write(transcription + '\n')
-                        print(transcription)
-            except sr.UnknownValueError:
-                pass
-            except sr.RequestError as e:
-                print(f"Could not request results; {e}")
+    def _transcribe_live(self):
+        # Live transcription with Deepgram
+        audio_data = b''.join(self.audio_frames)
+        response = self.deepgram_client.transcription.prerecorded(
+            {'buffer': audio_data, 'mimetype': 'audio/wav'},
+            {'punctuate': True, 'diarize': True}
+        )
+        try:
+            transcription = response['results']['channels'][0]['alternatives'][0]['transcript']
+            if self.transcription_file:
+                with open(self.transcription_file, 'a') as f:
+                    f.write(transcription + '\n')
+                    print(transcription)
+        except Exception as e:
+            print(f"Error in transcribing: {e}")
 
     def stop_recording(self, save_path):
         if not self.is_recording:
@@ -88,36 +86,22 @@ class AudioRecorder:
 
         print(f"Recording saved to {save_path}.")
         print(f"Transcription saved to {self.transcription_file}.")
-        self.apply_diarization(save_path)
-
-    def apply_diarization(self, audio_path):
-        diarization = self.diarization_pipeline(audio_path)
-        with open(self.transcription_file, 'r') as f:
-            transcription = f.read()
-
-        diarized_transcript = ""
-        for turn, _, speaker in diarization.itertracks(yield_label=True):
-            diarized_transcript += f"Speaker {speaker}: {transcription[turn.start:turn.end]}\n"
-
-        with open(self.transcription_file, 'w') as f:
-            f.write(diarized_transcript)
 
     def start_transcribe_file(self, path):
         transcription_thread = threading.Thread(target=self.transcribe_file, args=(path,))
         transcription_thread.start()
 
     def transcribe_file(self, path):
-        with sr.AudioFile(path) as source:
-            audio_data = self.recognizer.record(source)
-
+        with open(path, 'rb') as audio_file:
+            response = self.deepgram_client.transcription.prerecorded(
+                {'buffer': audio_file, 'mimetype': 'audio/wav'},
+                {'punctuate': True, 'diarize': True}
+            )
         try:
-            transcription = self.recognizer.recognize_sphinx(audio_data, language=self.language)
+            transcription = response['results']['channels'][0]['alternatives'][0]['transcript']
             transcription_file = path.replace('.wav', '.txt')
             with open(transcription_file, 'w') as f:
                 f.write(transcription)
             print(f"Transcription saved to {transcription_file}.")
-            self.apply_diarization(path)
-        except sr.UnknownValueError:
-            print("Sphinx could not understand the audio.")
-        except sr.RequestError as e:
-            print(f"Could not request results from Sphinx service; {e}")
+        except Exception as e:
+            print(f"Error in transcribing: {e}")
