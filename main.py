@@ -5,6 +5,7 @@ import sounddevice as sd
 import os
 import sys
 import shutil
+import json
 
 # Local Packages Import
 from transcription import AudioRecorder
@@ -35,16 +36,16 @@ class HoverListWidget(QtWidgets.QListWidget):
         self.button_widget = ButtonWidget(self)
         self.button_widget.hide()
 
-    def enterEvent(self, event: QtGui.QEnterEvent):  
-        super().enterEvent(event)  
-        item = self.itemAt(self.mapFromGlobal(QtGui.QCursor.pos()))  
+    def enterEvent(self, event: QtGui.QEnterEvent):
+        super().enterEvent(event)
+        item = self.itemAt(self.mapFromGlobal(QtGui.QCursor.pos()))
         if item:
             rect = self.visualItemRect(item)
             self.button_widget.move(rect.right(), rect.top())
             self.button_widget.show()
 
-    def leaveEvent(self, event: QtCore.QEvent):  
-        super().leaveEvent(event)  
+    def leaveEvent(self, event: QtCore.QEvent):
+        super().leaveEvent(event)
         self.button_widget.hide()
 
 class Ui_MainWindow(object):
@@ -53,8 +54,17 @@ class Ui_MainWindow(object):
         self.mics = sd.query_devices()
         self.Mic = [mic['name'] for mic in self.mics if mic['max_input_channels'] > 0][0]
         self.Language = 'de-DE'
-        self.DATA = os.getcwd()+"\\DATA\\"
+        self.base_path = os.path.join(os.getenv('appdata'),'TranscriptionApp')
+        self.DATA_path = os.path.join(self.base_path,'DATA')
         self.projects = None
+
+        self.check_for_paths()
+
+    def check_for_paths(self):
+        if not os.path.exists(self.base_path):
+            os.mkdir(self.base_path)
+        if not os.path.exists(self.DATA_path):
+            os.mkdir(self.DATA_path)
 
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
@@ -97,7 +107,7 @@ class Ui_MainWindow(object):
         self.populate_language_select()
         self.LanguageSelect.currentTextChanged.connect(self.on_language_select_changed)
         self.verticalLayout.addLayout(self.gridLayout)
-        self.recordings = HoverListWidget(self.centralwidget)  
+        self.recordings = HoverListWidget(self.centralwidget)
         self.recordings.setMaximumSize(QtCore.QSize(385, 16777215))
         self.recordings.setObjectName("recordings")
         self.populate_recordings()
@@ -125,7 +135,7 @@ class Ui_MainWindow(object):
         self.tabWidget.addTab(self.tabTranscription, "Transcription")
 
         self.horizontalLayout.addWidget(self.tabWidget)
-        
+
         self.verticalLayout_2.addLayout(self.horizontalLayout)
         self.gridLayout_2 = QtWidgets.QGridLayout()
         self.gridLayout_2.setObjectName("gridLayout_2")
@@ -212,9 +222,9 @@ class Ui_MainWindow(object):
         if not file_name:  # Check if file selection was canceled
             return  # Do nothing if canceled
 
-        shutil.copy2(file_name, os.path.join(self.DATA, os.path.basename(file_name)))
+        shutil.copy2(file_name, os.path.join(self.DATA_path, os.path.basename(file_name)))
         self.populate_recordings()
-        self.recorder.start_transcribe_file(os.path.join(self.DATA, os.path.basename(file_name)))
+        self.recorder.start_transcribe_file(os.path.join(self.DATA_path, os.path.basename(file_name)))
 
     def populate_mic_select(self):
         # Get the list of available microphones.
@@ -234,7 +244,7 @@ class Ui_MainWindow(object):
             self.LanguageSelect.addItem(lang, tag)
 
     def populate_recordings(self):
-        self.projects = list(set([os.path.splitext(filename)[0] for filename in os.listdir(self.DATA)]))
+        self.projects = list(set([os.path.splitext(filename)[0] for filename in os.listdir(self.DATA_path)]))
 
         self.recordings.clear()
         self.recordings.addItems(self.projects)
@@ -255,31 +265,28 @@ class Ui_MainWindow(object):
         if not ok or not text:  # Check if 'Cancel' is clicked or if no text is entered.
             return  # Abort and return immediately if 'Cancel' is clicked.
 
-        save_path = os.path.join(self.DATA, f"{text}.wav")
+        save_path = os.path.join(self.DATA_path, f"{text}.wav")
         self.recorder.stop_recording(save_path)
         self.populate_recordings()
 
     def display_text(self, item):
-        # Get the text of the clicked item.
         project_name = item.text()
-
-        # Construct the path to the .txt file associated with the clicked item.
-        file_path = os.path.join(self.DATA, f"{project_name}.txt")
+        file_path = os.path.join(self.DATA_path, f"{project_name}.json")
 
         try:
-            # Try to open and read the file.
             with open(file_path, 'r') as file:
-                text = file.read()
+                data = json.load(file)
+                text = data.get('transcription', "No transcription available.")
+                summary = data.get('summary', "No summary available.")
         except FileNotFoundError:
             text = "The corresponding text file could not be found."
+            summary = "No summary available."
         except Exception as e:
             text = f"An error occurred: {str(e)}"
+            summary = "No summary available."
 
-        # Set the text to the Transcription tab's textBrowser.
         self.transcriptionTextBrowser.setText(text)
-
-        # Set placeholder text for the Summary tab.
-        self.summaryTextBrowser.setText("Summary placeholder text.")
+        self.summaryTextBrowser.setText(summary)
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
