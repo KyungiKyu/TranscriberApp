@@ -233,8 +233,12 @@ class SettingsDialog(QDialog):
         handler.write_settings('Templates','current_template',text.split('.')[0])
 
     def importFile(self):
-        options = QFileDialog.Options()
-        fileName, _ = QFileDialog.getOpenFileName(self, "Import File", "", "All Files (*);;Text Files (*.txt)", options=options)
+        fileName, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import File",
+            "",
+            "Text, Word, and Markdown Files (*.txt *.docx *.md)"
+        )
         if fileName:
             shutil.copyfile(fileName, os.path.join(self.directory_path, os.path.basename(fileName)))
             self.populateFileSelectionDropdown()

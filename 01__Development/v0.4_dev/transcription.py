@@ -42,7 +42,7 @@ class AudioRecorder():
     def __init__(self, handler):
         super().__init__()
 
-        self.openai_client = OpenAI(api_key = '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') #TODO: implement secure api key
+        self.openai_client = OpenAI(api_key = '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') #TODO: implement secure api key
 
         self.audio_model = 'whisper-1'
         self.chat_model = 'gpt-4'
@@ -213,6 +213,7 @@ class AudioRecorder():
         transcription_thread.start()
 
     def transcribe_file(self, path, file_import, mapping_id):
+        print(path)
         max_size = 26214400  # OpenAI's max size in bytes
         file_size = os.path.getsize(path)
         transcription_parts = []
