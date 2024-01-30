@@ -10,6 +10,7 @@ import time
 import logging
 import uuid
 import configparser
+import markdown2
 
 # Local Packages Import
 from transcription import AudioRecorder, MessageEvent
@@ -100,25 +101,27 @@ class SettingsDialog(QDialog):
     def __init__(self):
         super(SettingsDialog, self).__init__()
 
-        self.setWindowTitle("Settings")
-        self.setGeometry(100, 100, 400, 600)  # Adjust size as needed
+        self.config = handler.read_settings()
 
-        self.directory_path = os.path.join(os.getenv('APPDATA'), 'TranscriptionApp', 'Assets', 'GPT-Templates')
+        self.directory_path = os.path.join(os.getenv('APPDATA'), 'TranscriptionApp', 'Assets', 'custom-Templates')
 
         # Main layout
         layout = QVBoxLayout()
-
-        # General settings section (commented out for now)
-        # general_section = self.createGeneralSettingsGroupBox()
-        # layout.addWidget(general_section)
 
         # Vorlagen settings section
         vorlagen_section = self.createTemplateSettingsGroupBox()
         layout.addWidget(vorlagen_section)
 
+        # General settings section (commented out for now)
+        # general_section = self.createGeneralSettingsGroupBox()
+        # layout.addWidget(general_section)
+
         # Privacy settings section
         privacy_section = self.createPrivacySettingsGroupBox()
         layout.addWidget(privacy_section)
+
+        self.populateFileSelectionDropdown()
+        self.fileSelectionCombo.currentTextChanged.connect(self.onTemplateSelectionChanged)
 
         self.setLayout(layout)
 
@@ -198,7 +201,6 @@ class SettingsDialog(QDialog):
 
         # File selection dropdown
         self.fileSelectionCombo = QComboBox()
-        self.populateFileSelectionDropdown()
         layout.addWidget(self.fileSelectionCombo)
 
         # Import button
@@ -211,10 +213,24 @@ class SettingsDialog(QDialog):
 
     def populateFileSelectionDropdown(self):
         self.fileSelectionCombo.clear()
+        current_template = self.config['Templates']['current_template']
+        found = False  # Flag to check if current template is found
+
         if os.path.exists(self.directory_path):
             for file in os.listdir(self.directory_path):
                 if os.path.isfile(os.path.join(self.directory_path, file)):
-                    self.fileSelectionCombo.addItem(file)
+                    file_name_without_extension = os.path.splitext(file)[0]
+                    self.fileSelectionCombo.addItem(file_name_without_extension)
+                    if file_name_without_extension == current_template:
+                        self.fileSelectionCombo.setCurrentText(file_name_without_extension)
+                        found = True
+
+        if not found and self.fileSelectionCombo.count() > 0:
+            # If current template not found, set the first item as default
+            self.fileSelectionCombo.setCurrentIndex(0)
+
+    def onTemplateSelectionChanged(self, text):
+        handler.write_settings('Templates','current_template',text.split('.')[0])
 
     def importFile(self):
         options = QFileDialog.Options()
@@ -464,7 +480,12 @@ class handler(QObject):
         self.config = configparser.ConfigParser()
         self.config.read(self.settings_file)
 
-        self.protcol_template = self.config['Templates']['current_template']
+        return self.config
+
+    def write_settings(self, section, key, value):
+        self.config.set(section, key, value)
+        with open(self.settings_file, 'w') as configfile:
+            self.config.write(configfile)
 
     def event(self, event):
         if event.type() == MessageEvent.EVENT_TYPE:
@@ -649,7 +670,7 @@ class handler(QObject):
         # Construct the path to the .txt file associated with the clicked item.
         transcript_file_path = os.path.join(project_folder, 'transcript.txt')
         keynote_file_path = os.path.join(project_folder, 'keynote.txt')
-        protocol_file_path = os.path.join(project_folder, 'protocol.txt')
+        protocol_file_path = os.path.join(project_folder, 'protocol.md')
 
         # Transcription Text
         try:
@@ -683,18 +704,18 @@ class handler(QObject):
 
         # Protocol Text
         try:
-            # Try to open and read the file.
+            # Assuming you have the path to your markdown file in protocol_file_path
             with open(protocol_file_path, 'r') as file:
-                text = file.read()
-
+                markdown_text = file.read()
+                html_text = markdown2.markdown(markdown_text)
         except FileNotFoundError:
-            text = "The corresponding text file could not be found."
-
+            html_text = "The corresponding markdown file could not be found."
         except Exception as e:
-            text = f"An error occurred: {str(e)}"
+            html_text = f"An error occurred: {str(e)}"
 
-        # Set the text to the textBrowserTranscript.
-        self.ui.textBrowserProtocol.setText(text)
+        # Set the HTML content to the textBrowserProtocol
+        self.ui.textBrowserProtocol.setHtml(html_text)
+
 
     def closeEvent(self, event):
         if self.timer_thread.is_alive():

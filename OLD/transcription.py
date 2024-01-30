@@ -11,6 +11,7 @@ import requests
 
 class AudioRecorder:
     def __init__(self, deepgram_api_key):
+<<<<<<< Updated upstream:OLD/transcription.py
         self.deepgram_api_key = deepgram_api_key
         self.deepgramLive = None
         self.loop = asyncio.get_event_loop()
@@ -73,34 +74,63 @@ class AudioRecorder:
         print("Transcription stopped.")
 
     def _record(self):
+=======
+        self.audio_frames = []
+        self.is_recording = False
+        self.stream = None
+        self.deepgram_socket = None
+        self.live_transcription_text = ""
+        self.deepgram_client = Deepgram(deepgram_api_key)
+        self.language = 'de-De'  # Update this based on your preference
+
+    def _record(self):
+        p = pyaudio.PyAudio()
+        self.stream = p.open(format=pyaudio.paInt16,
+                             channels=1,
+                             rate=16000,
+                             input=True,
+                             input_device_index=self.mic_index,
+                             frames_per_buffer=1024)
+
+>>>>>>> Stashed changes:transcription.py
         while self.is_recording:
-            data = self.stream.read(1024)
+            data = self.stream.read(1024, exception_on_overflow=False)
             self.audio_frames.append(data)
-        print("Recording stopped.")
 
-    def _transcribe_live(self):
-        # Live transcription with Deepgram
-        audio_data = b''.join(self.audio_frames)
+        self.stream.stop_stream()
+        self.stream.close()
 
-        # Create a new event loop for the thread
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+    def start_recording(self, mic_index, language):
+        if self.is_recording:
+            print("Recording is already in progress.")
+            return
 
-        # Use asyncio.run to run the coroutine
-        response = loop.run_until_complete(
-            self.deepgram_client.transcription.prerecorded(
-                {'buffer': audio_data, 'mimetype': 'audio/wav'},
-                {'punctuate': True, 'diarize': True}
-            )
-        )
+        self.is_recording = True
+        self.mic_index = mic_index
 
-        try:
-            transcription = response['results']['channels'][0]['alternatives'][0]['transcript']
-            self.live_transcription_text += transcription + '\n'  # Append transcription
-            print(transcription)
-        except Exception as e:
-            print(f"Error in transcribing: {e}")
+        recording_thread = threading.Thread(target=self._record)
+        recording_thread.start()
 
+<<<<<<< Updated upstream:OLD/transcription.py
+=======
+        print("Recording started.")
+
+    def stop_recording(self, save_path):
+        self.is_recording = False
+
+        wf = wave.open(save_path, 'wb')
+        wf.setnchannels(1)
+        wf.setsampwidth(pyaudio.PyAudio().get_sample_size(pyaudio.paInt16))
+        wf.setframerate(16000)
+        wf.writeframes(b''.join(self.audio_frames))
+        wf.close()
+
+        self.audio_frames = []  # Reset the audio frames buffer
+
+        print(f"Recording saved to {save_path}.")
+        self.start_transcribe_file(save_path)
+
+>>>>>>> Stashed changes:transcription.py
     def start_transcribe_file(self, path):
         transcription_thread = threading.Thread(target=self._run_async_transcription, args=(path,))
         transcription_thread.start()

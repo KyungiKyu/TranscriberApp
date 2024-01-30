@@ -13,6 +13,7 @@ import soundfile as sf
 import shutil
 import logging
 import json
+import configparser
 
 from PyQt6.QtCore import QEvent, QCoreApplication
 
@@ -20,6 +21,13 @@ from PyQt6.QtCore import QEvent, QCoreApplication
 logging.basicConfig(filename=str(os.path.join(os.getenv('APPDATA'), 'TranscriptionApp','transcription.log')), level=logging.DEBUG,
                     format='%(asctime)s %(levelname)s %(name)s %(message)s')
 logger = logging.getLogger(__name__)
+
+global config_path
+config_path = os.path.join(os.getenv('APPDATA'), 'TranscriptionApp','settings.ini')
+
+global config
+config = configparser.ConfigParser()
+config.read(config_path)
 
 # Event Classes
 class MessageEvent(QEvent):
@@ -34,7 +42,7 @@ class AudioRecorder():
     def __init__(self, handler):
         super().__init__()
 
-        self.openai_client = OpenAI(api_key = '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') #TODO: implement secure api key
+        self.openai_client = OpenAI(api_key = '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') #TODO: implement secure api key
 
         self.audio_model = 'whisper-1'
         self.chat_model = 'gpt-4'
@@ -336,9 +344,14 @@ class AudioRecorder():
         transcription_text = f.read()
         f.close()
 
-        protocol_text = self.openai_client.chat.completions.create(model=self.chat_model, messages=[self.system_message_protocol,{'role':'user','content':f'This will be your basis on which you will create your protcol: \n{transcription_text}'}])
+
+        config.read(config_path)
+        template = config['Templates']['current_template']
+        template = open(f'{os.path.join(os.getenv("APPDATA"),"TranscriptionApp","Assets","custom-Templates",template)}.md','r').read()
+
+        protocol_text = self.openai_client.chat.completions.create(model=self.chat_model, messages=[self.system_message_protocol,{'role':'user','content':f'This will be your basis on which you will create your protcol: \n{transcription_text}\n\nThis will be your Template: \n{template}'}])
 
         path = os.path.join(self.transcription_mapping[mapping_id], 'transcript.txt')
-        f = open(path.replace('transcript','protocol'), 'w+')
+        f = open(path.split('.')[0].replace('transcript','protocol')+'.md', 'w+')
         f.write(protocol_text.choices[0].message.content)
         f.close()

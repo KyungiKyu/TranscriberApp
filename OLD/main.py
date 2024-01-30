@@ -30,24 +30,49 @@ class ButtonWidget(QtWidgets.QWidget):
         self.layout.addWidget(self.button2)
         self.layout.addWidget(self.button3)
 
+class CustomListItem(QtWidgets.QListWidgetItem):
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+        self.icon1 = QtGui.QIcon("path_to_icon1.png")
+        self.icon2 = QtGui.QIcon("path_to_icon2.png")
+
+    def addIcons(self, listWidget):
+        listWidget.setItemWidget(self, self.createWidget())
+
+    def createWidget(self):
+        widget = QtWidgets.QWidget()
+        layout = QtWidgets.QHBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addStretch()
+
+        button1 = QtWidgets.QPushButton()
+        button1.setIcon(self.icon1)
+        layout.addWidget(button1)
+
+        button2 = QtWidgets.QPushButton()
+        button2.setIcon(self.icon2)
+        layout.addWidget(button2)
+
+        return widget
 
 class HoverListWidget(QtWidgets.QListWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.button_widget = ButtonWidget(self)
-        self.button_widget.hide()
+        self.currentItem = None
 
     def enterEvent(self, event: QtGui.QEnterEvent):
         super().enterEvent(event)
         item = self.itemAt(self.mapFromGlobal(QtGui.QCursor.pos()))
-        if item:
-            rect = self.visualItemRect(item)
-            self.button_widget.move(rect.right(), rect.top())
-            self.button_widget.show()
+        if item and isinstance(item, CustomListItem):
+            item.addIcons(self)
+            self.currentItem = item
 
     def leaveEvent(self, event: QtCore.QEvent):
         super().leaveEvent(event)
-        self.button_widget.hide()
+        if self.currentItem:
+            self.setItemWidget(self.currentItem, None)
+            self.currentItem = None
+
 
 class Ui_MainWindow(object):
     def __init__(self):
@@ -170,7 +195,7 @@ class Ui_MainWindow(object):
         sizePolicy.setHeightForWidth(self.Pause.sizePolicy().hasHeightForWidth())
         self.Pause.setSizePolicy(sizePolicy)
         self.Pause.setText("")
-        self.Pause.setIcon(QtGui.QIcon("J:/50__EDV/69__Development/TranscriptionAI/01__Development/v0.1_dev/Assets/pause.png"))
+        self.Pause.setIcon(QtGui.QIcon("./Assets/pause.png"))
         self.Pause.setObjectName("Pause")
         self.Pause.clicked.connect(self.save_recording)
         self.gridLayout_2.addWidget(self.Pause, 0, 3, 1, 1)
@@ -260,9 +285,12 @@ class Ui_MainWindow(object):
         self.projects = list(set([os.path.splitext(filename)[0] for filename in os.listdir(self.DATA_path)]))
 
         self.recordings.clear()
-        self.recordings.addItems(self.projects)
-        self.recordings.sortItems()
+        for project in self.projects:
+            item = CustomListItem(project)
+            self.recordings.addItem(item)
+            item.addIcons(self.recordings)  # Add icons to each item
 
+        self.recordings.sortItems()
         self.recordings.itemClicked.connect(self.display_text)
 
     def on_mic_select_changed(self, mic_name):
