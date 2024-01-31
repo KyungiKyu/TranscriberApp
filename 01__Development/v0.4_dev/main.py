@@ -514,7 +514,7 @@ class handler(QObject):
         # Start the timer thread
         self.timer_thread.start()
 
-        self.recorder.start_recording(mic_index=[mic['index'] for mic in self.mics if mic['name'] == self.Mic][0], sys_sound_device=[mic['index'] for mic in self.mics if 'Stereo Mix' in mic['name']][0])
+        self.recorder.start_recording(mic_index=[mic['index'] for mic in self.mics if mic['name'] == self.Mic][0], sys_sound_device=[mic['index'] for mic in self.mics if 'Line 1' in mic['name']][0])
 
     def update_timer(self):
         self.elapsed_time += 1
@@ -540,7 +540,7 @@ class handler(QObject):
 
         os.mkdir(project_folder) # Create project folder
 
-        self.recorder.transcription_mapping[temp_file_path] = text
+        self.recorder.transcription_mapping[temp_file_path] = os.path.join(self.data_folder,text)
 
         # Reset the elapsed time to zero
         self.elapsed_time = 0
